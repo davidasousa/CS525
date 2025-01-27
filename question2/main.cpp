@@ -15,7 +15,6 @@ int main(int argc, char* argv[]) {
 			a[idx] = 2;
 		}
 
-		printf("A");
 		gettimeofday(&start, nullptr);
 		for(int i = 0; i < skip * length; i += skip) {
 			sum += a[i];
