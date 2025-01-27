@@ -23,7 +23,7 @@ int main(int argc, char* argv[]) {
 		timersub(&end, &start, &diff);
 		delete a;
 
-		fprintf(fp, "Skip: %ld, Total Time: %ld\n", skip, diff.tv_usec);
+		fprintf(fp, "Skip: %ld, Total Time: %ld\n", skip, diff.tv_sec * 100000 + diff.tv_usec);
 	}
 	fclose(fp);
 }
