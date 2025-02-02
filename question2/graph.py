@@ -15,9 +15,10 @@ for line in lines:
 
 plt.plot(skipValues, totalTime)
 plt.title("Skip Value Vs Total Loop Duration")
+plt.xlim(1,100)
 plt.ylim(20000,160000)
-plt.xticks(np.linspace(1, 100, 10))
-plt.yticks(np.linspace(20000, 240000, 12))
+plt.xticks(np.arange(0, 100, 5))
+plt.yticks(np.linspace(20000, 240000, 23))
 plt.xlabel('Skip Value')
-plt.ylabel('Total Loop Duration (ms)')
+plt.ylabel('Total Loop Duration (micro seconds)')
 plt.show()

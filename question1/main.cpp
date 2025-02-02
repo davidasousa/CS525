@@ -9,20 +9,29 @@ int main(int argc, char* argv[]) {
 	for(size_t i = 0; i < length; i++) {
 		a[i];
 	}
-
-	// User Code
-	// PART 1: Running Time Of Loop
+  // Part One
 	struct timeval start_time, end_time, diff;
 	gettimeofday(&start_time, nullptr);
+	for(int i = 0; i < 1000; i++) {
+		sum += a[i];
+	}
+	gettimeofday(&end_time, nullptr);
+	timersub(&end_time, &start_time, &diff);
+	printf("The Total Time: %lu Iterations Is %ldus\n", length, diff.tv_usec);
+  // End Part 1
+  
+  sum = 0;
+  length = 10000000;
 
+	// Part 2
+	gettimeofday(&start_time, nullptr);
 	for(int i = 0; i < length; i++) {
 		sum += a[i];
 	}
-
 	gettimeofday(&end_time, nullptr);
 	timersub(&end_time, &start_time, &diff);
 
-	printf("The Total Time: %lu Iterations Is %ldms\n", length, diff.tv_usec);
+	printf("The Total Time: %lu Iterations Is %ldus\n", length, diff.tv_usec);
 	// End User Code
 
 	free(a);

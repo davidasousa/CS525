@@ -2,8 +2,8 @@
 #include <sys/time.h>
 
 int main(int argc, char* argv[]) {
-	int nums[100];
-	for(int idx = 0; idx < 100; idx++) {
+	int nums[1000000];
+	for(int idx = 0; idx < 1000000; idx++) {
 		nums[idx] = idx + 1;
 	}
 
@@ -12,7 +12,7 @@ int main(int argc, char* argv[]) {
 
 	// Non Unrolled Loop
 	gettimeofday(&start, nullptr);
-	for(int idx = 0; idx < 100; idx++) {
+	for(int idx = 0; idx < 1000000; idx++) {
 		sum += nums[idx];
 	}
 	gettimeofday(&end, nullptr);
@@ -20,11 +20,11 @@ int main(int argc, char* argv[]) {
 	timersub(&end, &start, &diff);
 	std::cout << "Time For The Non Unrolled Loop: "; 
 	std::cout << diff.tv_sec << "s" << " & ";
-	std::cout << diff.tv_usec << "ms" << std::endl;
+	std::cout << diff.tv_usec << "us" << std::endl;
 
 	// Unrolled Loop
 	gettimeofday(&start, nullptr);
-	for(int idx = 0; idx < 100; idx+=4) {
+	for(int idx = 0; idx < 1000000; idx+=4) {
 		sum += nums[idx];
 		sum += nums[idx + 1];
 		sum += nums[idx + 2];

@@ -10,20 +10,20 @@ int main(int argc, char* argv[]) {
 
 	for(size_t skip = 1; skip <= 100; skip++) {
 		long sum = 0;
-		long* a = (long*) malloc(sizeof(long) * skip * length);
+		long* a = new long[skip * length];
 		for(int idx = 0; idx < skip * length; idx++) {
 			a[idx] = 2;
 		}
-
+    // Time Experiment
 		gettimeofday(&start, nullptr);
 		for(int i = 0; i < skip * length; i += skip) {
 			sum += a[i];
 		}
 		gettimeofday(&end, nullptr);
 		timersub(&end, &start, &diff);
-		delete a;
-
+    // 
 		fprintf(fp, "Skip: %ld, Total Time: %ld\n", skip, diff.tv_sec * 100000 + diff.tv_usec);
+		delete[] a;
 	}
 	fclose(fp);
 }
