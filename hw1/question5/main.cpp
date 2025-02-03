@@ -62,11 +62,16 @@ int main(int argc, char* argv[]) {
 		// Iterating Across Tiles In C
 		for(int yt = 0; yt < div; yt++) {
 			for(int xt = 0; xt < div; xt++) {
+
 				// Iterating Through The Tile In C
 				for(int y = yt * tWidth; y < yt * tWidth + tWidth; y++) {
 					for(int x = xt * tWidth; x < xt * tWidth + tWidth; x++) {
+
 						// Iterating Through Tiles In A & B
+						// A Maintains The Row Of C
+						// B Maintains The Column Of C
 						for(int tIdx = 0; tIdx < div; tIdx++) {
+
 							// Iterating Through The Single Tile
 							for(int tpos = tIdx * tWidth; tpos < (tIdx + 1) * tWidth; tpos++) {
 								cTiled[y][x] += a[y][tpos] * b[tpos][x];
