@@ -64,7 +64,7 @@ int main(int argc, char* argv[]) {
 		gettimeofday(&end_time, nullptr);
 		timersub(&end_time, &start_time, &diff);
 
-		fprintf(fp, "%d : %d %d\n", size, diff.tv_sec, diff.tv_usec);
+		fprintf(fp, "%d : %ld %ld\n", size, diff.tv_sec, diff.tv_usec);
 	}
 
 	fclose(fp);
