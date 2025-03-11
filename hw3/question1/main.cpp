@@ -1,73 +1,49 @@
 #include <iostream>
 #include <sys/time.h>
 #include <mpi.h>
+#include <unistd.h>
 
 int main(int argc, char* argv[]) {
 	MPI_Init(&argc, &argv);
 	struct timeval start_time, end_time, diff;
-	FILE* fp = fopen("results", "-w");
 
-	MPI_Comm comm1, comm2;
-	int rank1, rank2;
-	MPI_Comm_rank(MPI_COMM_WORLD, &rank1);
-	MPI_Comm_rank(MPI_COMM_WORLD, &rank2);
+	int rank;
+	int size;
 	MPI_Status status;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
+	if(rank == 0) {
+		// Sender
+		FILE* fp = fopen("results", "w");
+		for(int idx = 1; idx < 100; idx++) {
+			int msg_size = idx * 1000;
+			char* msg = new char[msg_size];
+			gettimeofday(&start_time, nullptr);
+			
+			for(int jdx = 0; jdx < 10000; jdx++) {
+				MPI_Send((void*) msg, msg_size, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
+				MPI_Recv((void*) msg, msg_size, MPI_BYTE, 1, 0, MPI_COMM_WORLD, &status);
+			}
 
-	for(int idx = 1; idx <= 100; idx++) {
-		int size = idx * 1000;
-		char* message = new char[size];
-		char* recvBuf = new char[size];
+			gettimeofday(&end_time, nullptr);
+			timersub(&end_time, &start_time, &diff);
 
-		gettimeofday(&start_time, nullptr);
-		for(int jdx = 0; jdx < 3; jdx++) {
-			// Send 1 -> 2
-			MPI_Send(
-				(void*) message, 
-				size,
-				MPI_BYTE,
-				rank2,
-				0,
-				MPI_COMM_WORLD
-			);
-			// Recv 1 -> 2
-			MPI_Recv(
-				(void*) recvBuf,
-				size,
-				MPI_BYTE,
-				rank1,
-				0,
-				MPI_COMM_WORLD,
-				&status
-			);
-			// Send 2 -> 1
-			MPI_Send(
-				(void*) recvBuf, 
-				size,
-				MPI_BYTE,
-				rank1,
-				0,
-				MPI_COMM_WORLD
-			);
-			// Recv 2 -> 1
-			MPI_Recv(
-				(void*) message,
-				size,
-				MPI_BYTE,
-				rank2,
-				0,
-				MPI_COMM_WORLD,
-				&status
-			);
+			fprintf(fp, "%ld\n", diff.tv_sec * 1000000 + diff.tv_usec);
 		}
-		
-		gettimeofday(&end_time, nullptr);
-		timersub(&end_time, &start_time, &diff);
+		fclose(fp);
+	} else {
+		// Reciever
+		for(int idx = 1; idx < 100; idx++) {
+			int msg_size = idx * 1000;
+			char* msg_buf = new char[msg_size];
 
-		fprintf(fp, "%d : %ld %ld\n", size, diff.tv_sec, diff.tv_usec);
+			for(int jdx = 0; jdx < 10000; jdx++) {
+				MPI_Recv((void*) msg_buf, msg_size, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &status);
+				MPI_Send((void*) msg_buf, msg_size, MPI_BYTE, 0, 0, MPI_COMM_WORLD);
+			}
+		}
 	}
 
-	fclose(fp);
 	MPI_Finalize();
 	return 0;
 }
