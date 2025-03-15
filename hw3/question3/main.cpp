@@ -34,10 +34,10 @@ find_median_of_three(std::vector<int> list) {
 	std::vector<int> vec = {
 		list.front(), 
 		list[list.size() / 2], 
-		list[list.back()]
+		list.back()
 	};
 	std::sort(vec.begin(), vec.end());
-	return vec[1];
+	return vec.at(1);
 }
 
 std::vector<int>
@@ -47,51 +47,48 @@ pqsort(std::vector<int> vec, int poffset, int rank) {
 		std::sort(vec.begin(), vec.end());
 		return vec;
 	}
-	int pivot = find_median_of_three(vec);
+
 	// Creating Two New Vectors
+	int pivot = find_median_of_three(vec);
 	std::vector<int> lvec, rvec;
 	for(auto it = vec.begin(); it != vec.end(); it++) {
 		if(*it < pivot) { lvec.push_back(*it); }
 		else { rvec.push_back(*it); }
 	}
 
-	int rvec_size = rvec.size();
 	// Left Vec Remains In Rank 
 	// Right Vec Goes To Rank + Poffset
+	int rvec_size = rvec.size();
 	MPI_Send(&rank, 1, MPI_INT, rank + poffset, 0, MPI_COMM_WORLD);
 	MPI_Send(&poffset, 1, MPI_INT, rank + poffset, 0, MPI_COMM_WORLD);
 	MPI_Send(&rvec_size, 1, MPI_INT, rank + poffset, 0, MPI_COMM_WORLD);
 
 	// Sending Right Vector
 	MPI_Send(rvec.data(), rvec_size, MPI_INT, rank + poffset, 0, MPI_COMM_WORLD);
-
 	// Sorting Lvec
 	lvec = pqsort(lvec, poffset / 2, rank); 
-
 	// Receiving Sorted Rvec
 	MPI_Status status;
 	MPI_Recv(rvec.data(), rvec_size, MPI_INT, rank + poffset, 0, MPI_COMM_WORLD, &status);
 
-	// Putting The Two Together
 	lvec.insert(lvec.end(), rvec.begin(), rvec.end());
 	return lvec;
 }
 
 int main(int argc, char* argv[]) {
-	int signal_finish = 0;
 	int rank, size;
 	struct timeval start, end, diff;
+
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	MPI_Status status;
 
 	int test_sizes[] = {
 		100000,
 		1000000,
 		10000000
 	};
-
-	MPI_Init(&argc, &argv);
-	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	MPI_Comm_size(MPI_COMM_WORLD, &size);
-	MPI_Status status;
 
 	if(rank > 0) { // All Processes > 0 Will Recieve A Right Of Pivot Vector
 		// Recieving Source Rank, Vector Size & Offset
