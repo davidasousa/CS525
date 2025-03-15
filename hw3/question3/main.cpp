@@ -138,17 +138,30 @@ int main(int argc, char* argv[]) {
 		10000000
 	};
 	
-	int rank;
+	int rank, size;
 	MPI_Init(&argc, &argv);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	MPI_Status status;
 	
-	for(int test_idx = 0; test_idx < 1; test_idx++) {
+	if(rank == 0) { fp = fopen("results", "a"); }
+
+	for(int test_idx = 0; test_idx < 3; test_idx++) {
 		std::vector<int> test_vec = create_random_vec(test_sizes[test_idx]);
+		gettimeofday(&start, nullptr);
 		test_vec = pqsort(test_vec, 0, MPI_COMM_WORLD);
-		std::cout << check_sort(test_vec);
+		gettimeofday(&end, nullptr);
+		timersub(&end, &start, &diff);
+		if(rank == 0) {
+			fprintf(
+				fp,
+				"%d Processes, %d Elements, %ld Total MicroSeconds, Successfully Sorted: %d\n", 
+				size, test_sizes[test_idx], diff.tv_sec * 100000 + diff.tv_usec, (bool)check_sort(test_vec)
+			);
+		}
 	}
 
 	MPI_Finalize();
+	if(rank == 0) { fclose(fp); }
 	return 0;
 }
