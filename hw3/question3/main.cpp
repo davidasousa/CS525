@@ -92,7 +92,7 @@ int main(int argc, char* argv[]) {
 
 	FILE* fp = nullptr;
 	if(rank == 0) {
-		fp = fopen("results", "w");
+		fp = fopen("results", "a");
 	}
 
 	for(int test_idx = 0; test_idx < 3; test_idx++) {
@@ -119,8 +119,8 @@ int main(int argc, char* argv[]) {
 			// Writing Results
 			fprintf(
 				fp,
-				"%d Processes, %d Elements, %ld Total MicroSeconds\n", 
-				size, test_sizes[test_idx], diff.tv_sec * 100000 + diff.tv_usec
+				"%d Processes, %d Elements, %ld Total MicroSeconds, Successfully Sorted: %d\n", 
+				size, test_sizes[test_idx], diff.tv_sec * 100000 + diff.tv_usec, (bool)check_sort(test_vec)
 			);
 		}
 	}
