@@ -120,7 +120,7 @@ int main(int argc, char* argv[]) {
 			fprintf(
 				fp,
 				"%d Processes, %d Elements, %ld Total MicroSeconds, Successfully Sorted: %d\n", 
-				size, test_sizes[test_idx], diff.tv_sec * 100000 + diff.tv_usec, (bool)check_sort(test_vec)
+				size, test_sizes[test_idx], diff.tv_sec * 1000000 + diff.tv_usec, (bool)check_sort(test_vec)
 			);
 		}
 	}
