@@ -41,91 +41,82 @@ find_median_of_three(std::vector<int> list) {
 }
 
 std::vector<int>
-pqsort(std::vector<int> vec, int broadcaster, MPI_Comm bcast_group) {
-	int pivot;
+pqsort(std::vector<int> vec) {
 	int rank, size;
-	MPI_Status status;
-	MPI_Comm lower_bcast_group, upper_bcast_group;
-	bool first_pass = false;
-
-	while(true) {
-		MPI_Comm_rank(bcast_group, &rank);
-		MPI_Comm_size(bcast_group, &size);
-
-		if(size == 1) { break; }
-
-		// Splitting Broadcast Group -> Upper & Lower Half
-		int midpoint = (size / 2);
-		int color = (rank < midpoint) ? 0 : 1; // 1 If In Upper Half
-		MPI_Comm_split(bcast_group, !color, rank, &lower_bcast_group);
-		MPI_Comm_split(bcast_group, color, rank, &upper_bcast_group);
-
-		// Obtaining Sent Half -> Implies We Got It From The Upper Half
-		if(!first_pass) {
-			if(vec.empty()) {
-				int vec_size;
-				MPI_Recv(&vec_size, 1, MPI_INT, 0, 0, bcast_group, &status);
-
-				vec.resize(vec_size);
-				MPI_Recv(vec.data(), vec_size, MPI_INT, 0, 0, bcast_group, &status);
-
-				bcast_group = upper_bcast_group;
-			} else {
-				bcast_group = lower_bcast_group;
-			}
-		}
-				
-		MPI_Barrier(bcast_group); 
-		if(rank == broadcaster) {
-			pivot = find_median_of_three(vec);
-			MPI_Bcast(&pivot, 1, MPI_INT, 0, bcast_group);
-		}
-		MPI_Barrier(bcast_group);
-
-		if(rank == broadcaster) {
-			// Splitting Into Rvec & Lvec
-			std::vector<int> lvec, rvec;
-			for(auto it = vec.begin(); it != vec.end(); it++) {
-				if(*it < pivot) { lvec.push_back(*it); }
-				else { rvec.push_back(*it); }
-			}
-
-			// Send Lvec If In Upper, Rvec If In Lower
-			std::vector<int> vec = (broadcaster < size / 2) ? rvec : lvec;
-			int vec_size = (broadcaster < size / 2) ? rvec.size() : lvec.size();
-
-			MPI_Request request;
-			MPI_Isend(&vec_size, vec_size, MPI_INT, broadcaster, 0, upper_bcast_group, &request);	
-			MPI_Isend(vec.data(), vec_size, MPI_INT, broadcaster, 0, upper_bcast_group, &request);	
-
-			if(first_pass) { first_pass = false; };
-		}
-	} 
-
-	if(size == 1) { // Sending Everything Back To Rank 0
-		int vec_size = vec.size();
-		std::sort(vec.begin(), vec.end());
-		MPI_Request request;
-		MPI_Isend(&vec_size, vec.size(), MPI_INT, 0, 0, MPI_COMM_WORLD, &request);	
-		MPI_Isend(vec.data(), vec.size(), MPI_INT, 0, 0, MPI_COMM_WORLD, &request);	
-	}
-
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	MPI_Status status;
 
+	int pivot; 
 	if(rank == 0) {
-		for(int rank_idx = 0; rank_idx < 0; rank_idx++) {
-			int vec_size;
-			MPI_Recv(&vec_size, 1, MPI_INT, rank_idx, 0, bcast_group, &status);
-			
-			std::vector<int> new_vec(vec_size);
-			MPI_Recv(vec.data(), vec_size, MPI_INT, rank_idx, 0, bcast_group, &status);
-			
-			vec.insert(vec.end(), new_vec.begin(), new_vec.end());
-		}
+		pivot = find_median_of_three(vec);
+		MPI_Bcast(&pivot, 1, MPI_INT, 0, MPI_COMM_WORLD);
+	}
+	MPI_Barrier(MPI_COMM_WORLD);
+
+	int part_size = vec.size() / size;
+	int start = part_size * rank;
+	int end = (part_size + 1) * rank;
+
+	// Adding Remainder Numbers To Final Vec
+	std::vector<int> subvec(vec.begin() + start, vec.begin() + end);
+	if(rank == (size - 1) && end != vec.size()) {
+		subvec.insert(subvec.end(), vec.begin() + end, vec.end());
 	}
 
-	return vec;
+	// Partitioning Each Subvec
+	std::vector<int> lvec, rvec;
+	for(auto it = subvec.begin(); it != subvec.end(); it++) {
+		if(*it < pivot) { lvec.push_back(*it); }
+		else { rvec.push_back(*it); }
+	}
+	
+	if(rank < size / 2) {
+			// Sending The Rvec & Recieving Lvec
+			int rvec_size = rvec.size();
+			MPI_Send(&rvec_size, 1, MPI_INT, rank + size / 2, 0, MPI_COMM_WORLD);
+			MPI_Send(rvec.data(), rvec_size, MPI_INT, rank + size / 2, 0, MPI_COMM_WORLD);
+
+			int vec_size;
+			MPI_Recv(&vec_size, 1, MPI_INT, rank + size / 2, 0, MPI_COMM_WORLD, &status);
+			std::vector<int> nvec(vec_size);
+			MPI_Recv(nvec.data(), vec_size, MPI_INT, rank + size / 2, 0, MPI_COMM_WORLD, &status);
+
+			lvec.insert(lvec.end(), nvec.begin(), nvec.end());
+			subvec = lvec;
+	} else {
+			// Sending Lvec & Recieving Rvec
+			int lvec_size = lvec.size();
+			MPI_Send(&lvec_size, 1, MPI_INT, rank - size / 2, 0, MPI_COMM_WORLD);
+			MPI_Send(lvec.data(), lvec_size, MPI_INT, rank - size / 2, 0, MPI_COMM_WORLD);
+
+			int vec_size;
+			MPI_Recv(&vec_size, 1, MPI_INT, rank - size / 2, 0, MPI_COMM_WORLD, &status);
+			std::vector<int> nvec(vec_size);
+			MPI_Recv(nvec.data(), vec_size, MPI_INT, rank - size / 2, 0, MPI_COMM_WORLD, &status);
+
+			lvec.insert(lvec.end(), nvec.begin(), nvec.end());
+			subvec = lvec;
+	}
+
+	// Sorting The Individual Lists
+	std::sort(subvec.begin(), subvec.end());
+
+	int subvec_size = subvec.size();
+	if(rank > 0) {
+		MPI_Send(&subvec_size, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
+		MPI_Send(subvec.data(), subvec_size, MPI_INT, 0, 0, MPI_COMM_WORLD);
+	} else {
+		for(int rank_idx = 1; rank_idx < size; rank_idx++) {
+			MPI_Recv(&subvec_size, 1, MPI_INT, rank_idx, 0, MPI_COMM_WORLD, &status);
+			std::vector<int> nvec(subvec_size);
+			MPI_Recv(nvec.data(), subvec_size, MPI_INT, rank_idx, 0, MPI_COMM_WORLD, &status);	
+
+			subvec.insert(subvec.end(), nvec.begin(), nvec.end());
+		}
+	}
+		
+	return subvec;
 }
 
 int main(int argc, char* argv[]) {
@@ -147,11 +138,14 @@ int main(int argc, char* argv[]) {
 	if(rank == 0) { fp = fopen("results", "a"); }
 
 	for(int test_idx = 0; test_idx < 3; test_idx++) {
-		std::vector<int> test_vec = create_random_vec(test_sizes[test_idx]);
+		std::vector<int> test_vec;
+		test_vec = create_random_vec(test_sizes[test_idx]);
+
 		gettimeofday(&start, nullptr);
-		test_vec = pqsort(test_vec, 0, MPI_COMM_WORLD);
+		test_vec = pqsort(test_vec);
 		gettimeofday(&end, nullptr);
 		timersub(&end, &start, &diff);
+
 		if(rank == 0) {
 			fprintf(
 				fp,
