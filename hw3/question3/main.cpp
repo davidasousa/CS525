@@ -90,26 +90,44 @@ int main(int argc, char* argv[]) {
 		10000000
 	};
 
-	if(rank > 0) { // All Processes > 0 Will Recieve A Right Of Pivot Vector
-		// Recieving Source Rank, Vector Size & Offset
-		int src_rank, rvec_size, poffset;
-		MPI_Recv(&src_rank, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
-		MPI_Recv(&poffset, 1, MPI_INT, src_rank, 0, MPI_COMM_WORLD, &status);
-		MPI_Recv(&rvec_size, 1, MPI_INT, src_rank, 0, MPI_COMM_WORLD, &status);
-		// Recieving Vector
-		std::vector<int> rvec(rvec_size);
-		MPI_Recv(rvec.data(), rvec_size, MPI_INT, src_rank, 0, MPI_COMM_WORLD, &status);
-		// Calling PQsort
-		rvec = pqsort(rvec, poffset / 2, rank);
-		// Sending Back The Right Vector
-		MPI_Send(rvec.data(), rvec.size(), MPI_INT, src_rank, 0, MPI_COMM_WORLD);
-	} else {
-		std::vector<int> test_vec = create_random_vec(test_sizes[0]);
-		test_vec = pqsort(test_vec, size / 2, rank);
-
-		std::cout << check_sort(test_vec) << "\n"; 
+	FILE* fp = nullptr;
+	if(rank == 0) {
+		fp = fopen("results", "w");
 	}
 
+	for(int test_idx = 0; test_idx < 3; test_idx++) {
+		if(rank > 0) { // All Processes > 0 Will Recieve A Right Of Pivot Vector
+			// Recieving Source Rank, Vector Size & Offset
+			int src_rank, rvec_size, poffset;
+			MPI_Recv(&src_rank, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
+			MPI_Recv(&poffset, 1, MPI_INT, src_rank, 0, MPI_COMM_WORLD, &status);
+			MPI_Recv(&rvec_size, 1, MPI_INT, src_rank, 0, MPI_COMM_WORLD, &status);
+			// Recieving Vector
+			std::vector<int> rvec(rvec_size);
+			MPI_Recv(rvec.data(), rvec_size, MPI_INT, src_rank, 0, MPI_COMM_WORLD, &status);
+			// Calling PQsort
+			rvec = pqsort(rvec, poffset / 2, rank);
+			// Sending Back The Right Vector
+			MPI_Send(rvec.data(), rvec.size(), MPI_INT, src_rank, 0, MPI_COMM_WORLD);
+		} else {
+			std::vector<int> test_vec = create_random_vec(test_sizes[test_idx]);
+			// Performing Experiment
+			gettimeofday(&start, nullptr);
+			test_vec = pqsort(test_vec, size / 2, rank);
+			gettimeofday(&end, nullptr);
+			timersub(&end, &start, &diff);
+			// Writing Results
+			fprintf(
+				fp,
+				"%d Processes, %d Elements, %ld Total MicroSeconds\n", 
+				size, test_sizes[test_idx], diff.tv_sec * 100000 + diff.tv_usec
+			);
+		}
+	}
+
+	if(rank == 0) {
+		fclose(fp);
+	}
 
 	MPI_Finalize();
 	return 0;
