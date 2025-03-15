@@ -41,112 +41,82 @@ find_median_of_three(std::vector<int> list) {
 }
 
 std::vector<int>
-pqsort(std::vector<int> vec) {
-	int rank, size;
-	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	MPI_Comm_size(MPI_COMM_WORLD, &size);
-	MPI_Status status;
-
-	int pivot; 
-	if(rank == 0) {
-		pivot = find_median_of_three(vec);
-		MPI_Bcast(&pivot, 1, MPI_INT, 0, MPI_COMM_WORLD);
-	}
-	MPI_Barrier(MPI_COMM_WORLD);
-
-	int part_size = vec.size() / size;
-	int start = part_size * rank;
-	int end = (part_size + 1) * rank;
-
-	// Adding Remainder Numbers To Final Vec
-	std::vector<int> subvec(vec.begin() + start, vec.begin() + end);
-	if(rank == (size - 1) && end != vec.size()) {
-		subvec.insert(subvec.end(), vec.begin() + end, vec.end());
+pqsort(std::vector<int> vec, int poffset, int rank) {
+	if(poffset == 0) {
+		// Base Case -> Sort
+		std::sort(vec.begin(), vec.end());
+		return vec;
 	}
 
-	// Partitioning Each Subvec
+	// Creating Two New Vectors
+	int pivot = find_median_of_three(vec);
 	std::vector<int> lvec, rvec;
-	for(auto it = subvec.begin(); it != subvec.end(); it++) {
+	for(auto it = vec.begin(); it != vec.end(); it++) {
 		if(*it < pivot) { lvec.push_back(*it); }
 		else { rvec.push_back(*it); }
 	}
-	
-	if(rank < size / 2) {
-			// Sending The Rvec & Recieving Lvec
-			int rvec_size = rvec.size();
-			MPI_Send(&rvec_size, 1, MPI_INT, rank + size / 2, 0, MPI_COMM_WORLD);
-			MPI_Send(rvec.data(), rvec_size, MPI_INT, rank + size / 2, 0, MPI_COMM_WORLD);
 
-			int vec_size;
-			MPI_Recv(&vec_size, 1, MPI_INT, rank + size / 2, 0, MPI_COMM_WORLD, &status);
-			std::vector<int> nvec(vec_size);
-			MPI_Recv(nvec.data(), vec_size, MPI_INT, rank + size / 2, 0, MPI_COMM_WORLD, &status);
+	// Left Vec Remains In Rank 
+	// Right Vec Goes To Rank + Poffset
+	int rvec_size = rvec.size();
+	MPI_Send(&rank, 1, MPI_INT, rank + poffset, 0, MPI_COMM_WORLD);
+	MPI_Send(&poffset, 1, MPI_INT, rank + poffset, 0, MPI_COMM_WORLD);
+	MPI_Send(&rvec_size, 1, MPI_INT, rank + poffset, 0, MPI_COMM_WORLD);
 
-			lvec.insert(lvec.end(), nvec.begin(), nvec.end());
-			subvec = lvec;
-	} else {
-			// Sending Lvec & Recieving Rvec
-			int lvec_size = lvec.size();
-			MPI_Send(&lvec_size, 1, MPI_INT, rank - size / 2, 0, MPI_COMM_WORLD);
-			MPI_Send(lvec.data(), lvec_size, MPI_INT, rank - size / 2, 0, MPI_COMM_WORLD);
+	// Sending Right Vector
+	MPI_Send(rvec.data(), rvec_size, MPI_INT, rank + poffset, 0, MPI_COMM_WORLD);
+	// Sorting Lvec
+	lvec = pqsort(lvec, poffset / 2, rank); 
+	// Receiving Sorted Rvec
+	MPI_Status status;
+	MPI_Recv(rvec.data(), rvec_size, MPI_INT, rank + poffset, 0, MPI_COMM_WORLD, &status);
 
-			int vec_size;
-			MPI_Recv(&vec_size, 1, MPI_INT, rank - size / 2, 0, MPI_COMM_WORLD, &status);
-			std::vector<int> nvec(vec_size);
-			MPI_Recv(nvec.data(), vec_size, MPI_INT, rank - size / 2, 0, MPI_COMM_WORLD, &status);
-
-			lvec.insert(lvec.end(), nvec.begin(), nvec.end());
-			subvec = lvec;
-	}
-
-	// Sorting The Individual Lists
-	std::sort(subvec.begin(), subvec.end());
-
-	int subvec_size = subvec.size();
-	if(rank > 0) {
-		MPI_Send(&subvec_size, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
-		MPI_Send(subvec.data(), subvec_size, MPI_INT, 0, 0, MPI_COMM_WORLD);
-	} else {
-		for(int rank_idx = 1; rank_idx < size; rank_idx++) {
-			MPI_Recv(&subvec_size, 1, MPI_INT, rank_idx, 0, MPI_COMM_WORLD, &status);
-			std::vector<int> nvec(subvec_size);
-			MPI_Recv(nvec.data(), subvec_size, MPI_INT, rank_idx, 0, MPI_COMM_WORLD, &status);	
-
-			subvec.insert(subvec.end(), nvec.begin(), nvec.end());
-		}
-	}
-		
-	return subvec;
+	lvec.insert(lvec.end(), rvec.begin(), rvec.end());
+	return lvec;
 }
 
 int main(int argc, char* argv[]) {
-	FILE* fp = nullptr;
+	int rank, size;
 	struct timeval start, end, diff;
+
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	MPI_Status status;
 
 	int test_sizes[] = {
 		100000,
 		1000000,
 		10000000
 	};
-	
-	int rank, size;
-	MPI_Init(&argc, &argv);
-	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	MPI_Comm_size(MPI_COMM_WORLD, &size);
-	MPI_Status status;
-	
-	if(rank == 0) { fp = fopen("results", "a"); }
+
+	FILE* fp = nullptr;
+	if(rank == 0) {
+		fp = fopen("results", "a");
+	}
 
 	for(int test_idx = 0; test_idx < 3; test_idx++) {
-		std::vector<int> test_vec;
-		test_vec = create_random_vec(test_sizes[test_idx]);
-
-		gettimeofday(&start, nullptr);
-		test_vec = pqsort(test_vec);
-		gettimeofday(&end, nullptr);
-		timersub(&end, &start, &diff);
-
-		if(rank == 0) {
+		if(rank > 0) { // All Processes > 0 Will Recieve A Right Of Pivot Vector
+			// Recieving Source Rank, Vector Size & Offset
+			int src_rank, rvec_size, poffset;
+			MPI_Recv(&src_rank, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
+			MPI_Recv(&poffset, 1, MPI_INT, src_rank, 0, MPI_COMM_WORLD, &status);
+			MPI_Recv(&rvec_size, 1, MPI_INT, src_rank, 0, MPI_COMM_WORLD, &status);
+			// Recieving Vector
+			std::vector<int> rvec(rvec_size);
+			MPI_Recv(rvec.data(), rvec_size, MPI_INT, src_rank, 0, MPI_COMM_WORLD, &status);
+			// Calling PQsort
+			rvec = pqsort(rvec, poffset / 2, rank);
+			// Sending Back The Right Vector
+			MPI_Send(rvec.data(), rvec.size(), MPI_INT, src_rank, 0, MPI_COMM_WORLD);
+		} else {
+			std::vector<int> test_vec = create_random_vec(test_sizes[test_idx]);
+			// Performing Experiment
+			gettimeofday(&start, nullptr);
+			test_vec = pqsort(test_vec, size / 2, rank);
+			gettimeofday(&end, nullptr);
+			timersub(&end, &start, &diff);
+			// Writing Results
 			fprintf(
 				fp,
 				"%d Processes, %d Elements, %ld Total MicroSeconds, Successfully Sorted: %d\n", 
@@ -155,7 +125,10 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
+	if(rank == 0) {
+		fclose(fp);
+	}
+
 	MPI_Finalize();
-	if(rank == 0) { fclose(fp); }
 	return 0;
 }
