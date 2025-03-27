@@ -7,6 +7,7 @@
 // Constant Values
 #define MAX_THREAD_COUNT 2
 #define PART_1_LENGTH 10
+#define PART_2_LENGTH 5
 
 // Defining Structures & BST Functions
 typedef struct node {
@@ -84,25 +85,61 @@ remove(node* head, int val) {
 	pthread_mutex_lock(head -> node_mutex);
 	if(head -> parent_mutex != nullptr) { pthread_mutex_unlock(head -> parent_mutex); }
 
-	std::cout << head -> val << "\n" << std::flush;
-
-	if(head == nullptr) { return; }
-
 	node* temp = nullptr;
 	if(head -> val > val) { 
-		std::cout << "L\n" << std::flush;
-		if(head -> left -> val == val) { 
+		if(head -> left == nullptr) { 
+			pthread_mutex_unlock(head -> parent_mutex);
+			return; 
+		} else if(head -> left -> val == val) { 
+			// Deleting Node 
 			temp = head -> left;
-			head -> left = nullptr;
+
+			// If Node Has Children -> Shift Nodes
+			if(temp -> left != nullptr) {
+				temp -> left -> right = temp -> right;
+				head -> left = temp -> left;
+			} else if(temp -> right != nullptr) {
+				temp -> right -> left = temp -> left;
+				head -> left = temp -> right;
+			} else { head -> left = nullptr; }
+
+			delete temp -> node_mutex;
+			delete temp;
+			// Unlocking Mutex
+			pthread_mutex_unlock(head -> node_mutex);
 		} else { remove(head -> left, val); }
 	} else if(head -> val < val) { 
-		std::cout << "R\n" << std::flush;
-		if(head -> right -> val == val) { 
+		if(head -> right == nullptr) { 
+			pthread_mutex_unlock(head -> parent_mutex);
+			return; 
+		} else if(head -> right -> val == val) { 
+			// Deleting Node
 			temp = head -> right;
+
+			// If Node Has Children -> Shift Nodes
+			if(temp -> left != nullptr) {
+				temp -> left -> right = temp -> right;
+				head -> right = temp -> left;
+			} else if(temp -> right != nullptr) {
+				temp -> right -> left = temp -> left;
+				head -> right = temp -> right;
+			} else { head -> right = nullptr; }
+
 			head -> right = nullptr;
+			delete temp -> node_mutex;
+			delete temp;
+			// Unlocking Mutex
+			pthread_mutex_unlock(head -> node_mutex);
 		} else { remove(head -> right, val); }
 	}
 	return;
+}
+
+void*
+thread_delete(void* arg) {
+	node_val* args = (node_val*) arg;
+	remove(args -> head, args -> val);
+	return nullptr;
 }
 
 // Main Functions
@@ -132,7 +169,6 @@ main(int argc, char* argv[]) {
 		node_val { head, 10 },	
 	};
 
-	int tidx = -1;
 	int task_count = 1;
 	while(task_count < PART_1_LENGTH) {
 		for(int tidx = 0; tidx < MAX_THREAD_COUNT; tidx++) {
@@ -147,18 +183,39 @@ main(int argc, char* argv[]) {
 
 	gettimeofday(&end, nullptr);	
 	timersub(&end, &start, &diff);
-
-	std::cout << "Total uS Parallelized: " << diff.tv_usec << std::endl;
-
-	print_tree(head);
+	std::cout << "Part 1, Total uS Parallelized: " << diff.tv_usec << std::endl;
 
 	// End Part 1
-	std::cout << "\n";
-	//remove(head, 7);
-	//remove(head, 6);
-	print_tree(head);
-	delete_tree(head);
 
+	// Start Part 2
+	void* (*del)(void*) = thread_delete;
+	std::vector<node_val> q2_args = {
+		node_val { head, 7 },
+		node_val { head, 0 },
+		node_val { head, 6 },
+		node_val { head, 2 },
+		node_val { head, 10 },
+	};
+
+	task_count = 0;
+	while(task_count < PART_2_LENGTH) {
+		for(int tidx = 0; tidx < MAX_THREAD_COUNT; tidx++) {
+			pthread_create(&threads[tidx], nullptr, del, (void*) &q2_args[task_count++]);
+			if(task_count == PART_2_LENGTH) { break; }
+		}
+			
+		for(int tidx = 0; tidx < MAX_THREAD_COUNT; tidx++) {
+			pthread_join(threads[tidx], nullptr);		
+		}
+	}
+
+	gettimeofday(&end, nullptr);	
+	timersub(&end, &start, &diff);
+	std::cout << "Part 2, Total uS Parallelized: " << diff.tv_usec << std::endl;
+
+	// End Part 2
+
+	delete_tree(head);
 	return 0;
 }
 

@@ -53,7 +53,8 @@ void deleteTree(node* head) {
 // Main Functions
 int main(int argc, char* argv[]) {
 	struct timeval start, end, diff;
-	gettimeofday(&end, nullptr);	
+	// Part 1
+	gettimeofday(&start, nullptr);	
 
 	node* head = nullptr;
 	head = insert(head, 5);
@@ -69,8 +70,9 @@ int main(int argc, char* argv[]) {
 
 	gettimeofday(&end, nullptr);	
 	timersub(&end, &start, &diff);
+	std::cout << "Part 1, Total uS Sequentially: " << diff.tv_usec << std::endl;
 
-	std::cout << "Total uS Sequentially: " << diff.tv_usec << std::endl;
+
 	deleteTree(head);
 	return 0;
 }
