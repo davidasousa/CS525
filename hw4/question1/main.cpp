@@ -1,6 +1,7 @@
 #include <iostream>
 #include <unistd.h>
 #include <vector>
+#include <algorithm>
 #include "pthread.h"
 #include "sys/time.h"
 
@@ -8,6 +9,7 @@
 #define MAX_THREAD_COUNT 2
 #define PART_1_LENGTH 10
 #define PART_2_LENGTH 5
+#define PART_3_LENGTH 6
 
 // Defining Structures & BST Functions
 typedef struct node {
@@ -23,7 +25,8 @@ typedef struct node_val {
 	int val;
 } node_val;
 
-node* create_node(int val, pthread_mutex_t* pmutex) {
+node* 
+create_node(int val, pthread_mutex_t* pmutex) {
 	pthread_mutex_t* node_mutex = new pthread_mutex_t;
 	pthread_mutex_init(node_mutex, nullptr);
 	if(pmutex != nullptr) { pthread_mutex_unlock(pmutex); }
@@ -31,12 +34,19 @@ node* create_node(int val, pthread_mutex_t* pmutex) {
 }
 
 // Helper Functions
+// Print Tree With Formatting
+
 void 
-print_tree(node* head) {
+print_tree(node* head, int level) {
 	if(head == nullptr) { return; }
-	print_tree(head -> left);
-	std::cout << head -> val << " ";
-	print_tree(head -> right);
+	std::cout << "Level: " << level << " Value: " << head -> val;
+	std::cout << std::endl << std::flush;
+
+	std::cout << "Left " << std::flush;
+	print_tree(head -> left, level + 1);
+	std::cout << "Right " << std::flush;
+	print_tree(head -> right, level + 1);
+	std::cout << "Back " << std::flush;
 }
 
 void 
@@ -47,6 +57,8 @@ delete_tree(node* head) {
 	delete head -> node_mutex;
 	delete head;
 }
+
+// End Helper Functions
 
 // Insert In The Function -> Reduced Bottlenecks - Parallel Insert
 void
@@ -70,15 +82,28 @@ thread_insert(void* arg) {
 	return nullptr;
 }
 
-/*
-bool 
+bool
 lookup(node* head, int val) {
-	if(head == nullptr) { return false; }
+	pthread_mutex_lock(head -> node_mutex);
+	if(head -> parent_mutex != nullptr) { pthread_mutex_unlock(head -> parent_mutex); }
+
 	if(head -> val == val) { return true; }
-	if(head -> val > val) { return lookup(head -> left, val); }
-	else { return lookup(head -> right, val); }
+
+	if(head -> val > val) {
+		if(head -> left == nullptr) { return false;	} 
+		else { return lookup(head -> left, val); }
+	} else if(head -> val < val) {
+		if(head -> right == nullptr) { return false; } 
+		else { return lookup(head -> right, val); } 
+	}
+	return false;
 }
-*/
+
+void*
+thread_lookup(void* arg) {
+	node_val* args = (node_val*) arg;
+	return (void*) lookup(args -> head, args -> val);
+}
 
 void
 remove(node* head, int val) {
@@ -88,7 +113,7 @@ remove(node* head, int val) {
 	node* temp = nullptr;
 	if(head -> val > val) { 
 		if(head -> left == nullptr) { 
-			pthread_mutex_unlock(head -> parent_mutex);
+			pthread_mutex_unlock(head -> node_mutex);
 			return; 
 		} else if(head -> left -> val == val) { 
 			// Deleting Node 
@@ -110,7 +135,7 @@ remove(node* head, int val) {
 		} else { remove(head -> left, val); }
 	} else if(head -> val < val) { 
 		if(head -> right == nullptr) { 
-			pthread_mutex_unlock(head -> parent_mutex);
+			pthread_mutex_unlock(head -> node_mutex);
 			return; 
 		} else if(head -> right -> val == val) { 
 			// Deleting Node
@@ -183,7 +208,11 @@ main(int argc, char* argv[]) {
 
 	gettimeofday(&end, nullptr);	
 	timersub(&end, &start, &diff);
-	std::cout << "Part 1, Total uS Parallelized: " << diff.tv_usec << std::endl;
+	std::cout << "\nPart 1, Total uS Parallelized: " << diff.tv_usec << std::endl;
+	
+	std::cout << "\n" << std::flush;
+	print_tree(head, 0);
+	std::cout << "\n" << std::flush;
 
 	// End Part 1
 
@@ -211,14 +240,45 @@ main(int argc, char* argv[]) {
 
 	gettimeofday(&end, nullptr);	
 	timersub(&end, &start, &diff);
-	std::cout << "Part 2, Total uS Parallelized: " << diff.tv_usec << std::endl;
+	std::cout << "\nPart 2, Total uS Parallelized: " << diff.tv_usec << std::endl;
+
+	std::cout << "\n" << std::flush;
+	print_tree(head, 0);
+	std::cout << "\n" << std::flush;
 
 	// End Part 2
+
+	// Start Part 3
+	void* (*lkup)(void*) = thread_lookup;
+	std::vector<node_val> q3_args = {
+		node_val { head, 1 },
+		node_val { head, 6 },
+		node_val { head, 10 },
+		node_val { head, 5 },
+		node_val { head, 8 },
+		node_val { head, 0 },
+	};
+
+	task_count = 0;
+	while(task_count < 1) {
+		for(int tidx = 0; tidx < MAX_THREAD_COUNT; tidx++) {
+			pthread_create(&threads[tidx], nullptr, lkup, (void*) &q3_args[task_count++]);
+			if(task_count == 1) { break; }
+		}
+			
+		for(int tidx = 0; tidx < MAX_THREAD_COUNT; tidx++) {
+			pthread_join(threads[tidx], nullptr);		
+		}
+	}
+
+	gettimeofday(&end, nullptr);	
+	timersub(&end, &start, &diff);
+	std::cout << "\nPart 3, Total uS Parallelized: " << diff.tv_usec << std::endl;
+
+	std::cout << "\n" << std::flush;
+	print_tree(head, 0);
+	std::cout << "\n" << std::flush;
 
 	delete_tree(head);
 	return 0;
 }
-
-// Root Is Used To Prevent Race Conditions About The Actual Root Node
-// Used Stack Overflow Link
-// https://stackoverflow.com/questions/21390325/checking-if-a-thread-is-unused-c
