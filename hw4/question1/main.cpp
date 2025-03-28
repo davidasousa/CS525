@@ -85,15 +85,24 @@ thread_insert(void* arg) {
 bool
 lookup(node* head, int val) {
 	pthread_mutex_lock(head -> node_mutex);
-	if(head -> parent_mutex != nullptr) { pthread_mutex_unlock(head -> parent_mutex); }
+	if(head -> parent_mutex != nullptr) { 
+		pthread_mutex_unlock(head -> parent_mutex);
+	}
 
-	if(head -> val == val) { return true; }
-
-	if(head -> val > val) {
-		if(head -> left == nullptr) { return false;	} 
+	if(head -> val == val) { 
+		pthread_mutex_unlock(head -> node_mutex);
+		return true; 
+	} else if(head -> val > val) {
+		if(head -> left == nullptr) { 
+			pthread_mutex_unlock(head -> node_mutex);
+			return false;	
+		} 
 		else { return lookup(head -> left, val); }
 	} else if(head -> val < val) {
-		if(head -> right == nullptr) { return false; } 
+		if(head -> right == nullptr) { 
+			pthread_mutex_unlock(head -> node_mutex);
+			return false; 
+		} 
 		else { return lookup(head -> right, val); } 
 	}
 	return false;
@@ -105,56 +114,65 @@ thread_lookup(void* arg) {
 	return (void*) lookup(args -> head, args -> val);
 }
 
+// Recursive Insertion For Deletion To Insert No Nodes Are Lost
+void recursive_insert(node* head, node* ins) {
+	if(head == nullptr) { return; }
+	recursive_insert(head -> left, ins);
+	recursive_insert(head -> right, ins);
+	insert(ins, head -> val);
+	delete head;	
+}
+
 void
 remove(node* head, int val) {
 	pthread_mutex_lock(head -> node_mutex);
 	if(head -> parent_mutex != nullptr) { pthread_mutex_unlock(head -> parent_mutex); }
-
-	node* temp = nullptr;
+	
+	node* del = nullptr; // Node Being Deleted
+	node* swap = nullptr; // Node Taking The Place Of Del
 	if(head -> val > val) { 
 		if(head -> left == nullptr) { 
 			pthread_mutex_unlock(head -> node_mutex);
 			return; 
-		} else if(head -> left -> val == val) { 
-			// Deleting Node 
-			temp = head -> left;
+		} else if(head -> left -> val == val) { // Deleting Head -> Left
+			del = head -> left;
 
-			// If Node Has Children -> Shift Nodes
-			if(temp -> left != nullptr) {
-				temp -> left -> right = temp -> right;
-				head -> left = temp -> left;
-			} else if(temp -> right != nullptr) {
-				temp -> right -> left = temp -> left;
-				head -> left = temp -> right;
-			} else { head -> left = nullptr; }
+			if(del -> left != nullptr) {
+				swap = del -> left; 
+				swap -> right = del -> right; // Take The Right Of Del & Insert To Swap
+			} else if(del -> right != nullptr) {
+				// Del -> Left Is Nullptr
+				swap = del -> right; 
+				swap -> left = nullptr;
+			}
+			head -> left = swap; // Head Left Is Now Swap
+			if(swap != nullptr) { swap -> parent_mutex = head -> node_mutex; }
 
-			delete temp -> node_mutex;
-			delete temp;
-			// Unlocking Mutex
 			pthread_mutex_unlock(head -> node_mutex);
+			delete del -> node_mutex;
+			delete del;
 		} else { remove(head -> left, val); }
 	} else if(head -> val < val) { 
 		if(head -> right == nullptr) { 
 			pthread_mutex_unlock(head -> node_mutex);
 			return; 
 		} else if(head -> right -> val == val) { 
-			// Deleting Node
-			temp = head -> right;
+			del = head -> right;
 
-			// If Node Has Children -> Shift Nodes
-			if(temp -> left != nullptr) {
-				temp -> left -> right = temp -> right;
-				head -> right = temp -> left;
-			} else if(temp -> right != nullptr) {
-				temp -> right -> left = temp -> left;
-				head -> right = temp -> right;
-			} else { head -> right = nullptr; }
+			if(del -> left != nullptr) {
+				swap = del -> left; 
+				swap -> right = del -> right; // Take The Right Of Del & Insert To Swap
+			} else if(del -> right != nullptr) {
+				// Del -> Left Is Nullptr
+				swap = del -> right; 
+				swap -> left = nullptr;
+			}
+			head -> right = swap; 
+			if(swap != nullptr) { swap -> parent_mutex = head -> node_mutex; }
 
-			head -> right = nullptr;
-			delete temp -> node_mutex;
-			delete temp;
-			// Unlocking Mutex
 			pthread_mutex_unlock(head -> node_mutex);
+			delete del -> node_mutex;
+			delete del;
 		} else { remove(head -> right, val); }
 	}
 	return;
@@ -260,10 +278,10 @@ main(int argc, char* argv[]) {
 	};
 
 	task_count = 0;
-	while(task_count < 1) {
+	while(task_count < PART_3_LENGTH) {
 		for(int tidx = 0; tidx < MAX_THREAD_COUNT; tidx++) {
 			pthread_create(&threads[tidx], nullptr, lkup, (void*) &q3_args[task_count++]);
-			if(task_count == 1) { break; }
+			if(task_count == PART_3_LENGTH) { break; }
 		}
 			
 		for(int tidx = 0; tidx < MAX_THREAD_COUNT; tidx++) {
@@ -275,10 +293,7 @@ main(int argc, char* argv[]) {
 	timersub(&end, &start, &diff);
 	std::cout << "\nPart 3, Total uS Parallelized: " << diff.tv_usec << std::endl;
 
-	std::cout << "\n" << std::flush;
-	print_tree(head, 0);
-	std::cout << "\n" << std::flush;
-
 	delete_tree(head);
+
 	return 0;
 }
