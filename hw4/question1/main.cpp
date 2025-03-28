@@ -120,6 +120,7 @@ void recursive_insert(node* head, node* ins) {
 	recursive_insert(head -> left, ins);
 	recursive_insert(head -> right, ins);
 	insert(ins, head -> val);
+	delete head -> node_mutex;
 	delete head;	
 }
 
@@ -139,7 +140,8 @@ remove(node* head, int val) {
 
 			if(del -> left != nullptr) {
 				swap = del -> left; 
-				swap -> right = del -> right; // Take The Right Of Del & Insert To Swap
+				//swap -> right = del -> right; // Take The Right Of Del & Insert To Swap
+				recursive_insert(del -> right, swap);
 			} else if(del -> right != nullptr) {
 				// Del -> Left Is Nullptr
 				swap = del -> right; 
@@ -162,6 +164,7 @@ remove(node* head, int val) {
 			if(del -> left != nullptr) {
 				swap = del -> left; 
 				swap -> right = del -> right; // Take The Right Of Del & Insert To Swap
+				recursive_insert(del -> right, swap);
 			} else if(del -> right != nullptr) {
 				// Del -> Left Is Nullptr
 				swap = del -> right; 
@@ -278,6 +281,7 @@ main(int argc, char* argv[]) {
 	};
 
 	task_count = 0;
+	int true_count = 0; // For Checking The Validity Of Lookup
 	while(task_count < PART_3_LENGTH) {
 		for(int tidx = 0; tidx < MAX_THREAD_COUNT; tidx++) {
 			pthread_create(&threads[tidx], nullptr, lkup, (void*) &q3_args[task_count++]);
