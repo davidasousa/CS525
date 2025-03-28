@@ -289,13 +289,16 @@ main(int argc, char* argv[]) {
 		}
 			
 		for(int tidx = 0; tidx < MAX_THREAD_COUNT; tidx++) {
-			pthread_join(threads[tidx], nullptr);		
+			void* ans;
+			pthread_join(threads[tidx], &ans);		
+			if(ans != nullptr) { true_count++; }
 		}
 	}
 
 	gettimeofday(&end, nullptr);	
 	timersub(&end, &start, &diff);
 	std::cout << "\nPart 3, Total uS Parallelized: " << diff.tv_usec << std::endl;
+	std::cout << "\nPart 3, Nodes Found: " << true_count << std::endl;
 
 	delete_tree(head);
 
