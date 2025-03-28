@@ -293,7 +293,7 @@ main(int argc, char* argv[]) {
 		for(int tidx = 0; tidx < MAX_THREAD_COUNT; tidx++) {
 			void* ans;
 			pthread_join(threads[tidx], &ans);		
-			std::cout << q3_args[task_idx++].val  << " Node Found? "  << (ans == nullptr) <<  std::endl;
+			std::cout << q3_args[task_idx++].val  << " Node Found? "  << (ans != nullptr) <<  std::endl;
 		}
 	}
 
