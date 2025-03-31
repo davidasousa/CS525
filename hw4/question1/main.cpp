@@ -269,6 +269,7 @@ main(int argc, char* argv[]) {
 
 	// End Part 2
 
+	std::cout << "\n" << std::flush;
 	// Start Part 3
 	void* (*lkup)(void*) = thread_lookup;
 	std::vector<node_val> q3_args = {
@@ -282,6 +283,7 @@ main(int argc, char* argv[]) {
 
 	task_count = 0;
 	int true_count = 0; // For Checking The Validity Of Lookup
+	int task_idx = 0; 
 	while(task_count < PART_3_LENGTH) {
 		for(int tidx = 0; tidx < MAX_THREAD_COUNT; tidx++) {
 			pthread_create(&threads[tidx], nullptr, lkup, (void*) &q3_args[task_count++]);
@@ -289,7 +291,9 @@ main(int argc, char* argv[]) {
 		}
 			
 		for(int tidx = 0; tidx < MAX_THREAD_COUNT; tidx++) {
-			pthread_join(threads[tidx], nullptr);		
+			void* ans;
+			pthread_join(threads[tidx], &ans);		
+			std::cout << q3_args[task_idx++].val  << " Node Found? "  << (ans != nullptr) <<  std::endl;
 		}
 	}
 
