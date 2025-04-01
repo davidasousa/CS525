@@ -197,6 +197,9 @@ randomize_vec(std::vector<int>& vec, int frac, std::mt19937 gen) {
 // Main Functions
 int 
 main(int argc, char* argv[]) {
+	if(argc != 2) { return 1; }
+	int thread_count = std::stoi(argv[1]);
+
 	struct timeval start, end, diff;
 	// Task Count For Iteration
 	int task_count = 0;
@@ -209,80 +212,93 @@ main(int argc, char* argv[]) {
 	std::mt19937 gen(seed);
 	std::uniform_real_distribution<> dist(0.0, 1.0);
 	
-	for(int thread_count = 1; thread_count <= 2; thread_count++) {
-		gettimeofday(&start, nullptr);	
-		// Threads
-		pthread_t* threads = new pthread_t[thread_count];
+	gettimeofday(&start, nullptr);	
+	// Threads
+	pthread_t* threads = new pthread_t[thread_count];
 
-		// Number Array
-		int total_numbers = 3 * pow(10, 6);
-		std::vector<int> nums(total_numbers);
-		std::iota(nums.begin(), nums.end(), 0);
+	// Number Array
+	int total_numbers = 3 * pow(10, 6);
+	std::vector<int> nums(total_numbers);
+	std::iota(nums.begin(), nums.end(), 0);
 
-		// Shuffling The Array
-		std::vector<int> v1, v2, v3;
-		v1 = randomize_vec(nums, 3, gen); // Third Of Shuffled Nums
-		v2 = randomize_vec(v1, 2, gen); // Half Of Shuffed V1
-		v3 = randomize_vec(nums, 2, gen);	// Half Of Shuffled Nums
+	// Shuffling The Array
+	std::vector<int> v1, v2, v3;
+	v1 = randomize_vec(nums, 3, gen); // Third Of Shuffled Nums
+	v2 = randomize_vec(v1, 2, gen); // Half Of Shuffed V1
+	v3 = randomize_vec(nums, 2, gen);	// Half Of Shuffled Nums
 
-		// Creating The Three Heads
-		node* d1 = create_node(0, nullptr);
-		node* d2 = create_node(0, nullptr);
-		node* d3 = create_node(0, nullptr);
+	// Creating The Three Heads
+	node* d1 = create_node(0, nullptr);
+	node* d2 = create_node(0, nullptr);
+	node* d3 = create_node(0, nullptr);
 
-		// Inserting All V1 Values To D1
-		std::vector<node_val> d1_ins_args;
-		for(int z : v1) { d1_ins_args.push_back(node_val {d1, z}); }
-		while(task_count < v1.size()) {
-			for(int tidx = 0; tidx < thread_count; tidx++) {
-				pthread_create(&threads[tidx], nullptr, ins, (void*) &d1_ins_args[task_count++]);
-				if(task_count == v1.size()) { break; }
-			}	
-			for(int tidx = 0; tidx < thread_count; tidx++) {
-				pthread_join(threads[tidx], nullptr);		
-			}
+	// Inserting All V1 Values To D1
+	std::vector<node_val> d1_ins_args;
+	for(int z : v1) { d1_ins_args.push_back(node_val {d1, z}); }
+	while(task_count < v1.size()) {
+		for(int tidx = 0; tidx < thread_count; tidx++) {
+			pthread_create(&threads[tidx], nullptr, ins, (void*) &d1_ins_args[task_count++]);
+			if(task_count == v1.size()) { break; }
+		}	
+		for(int tidx = 0; tidx < thread_count; tidx++) {
+			pthread_join(threads[tidx], nullptr);		
 		}
-
-		// Deleting All V2 Nodes From D2
-		std::vector<node_val> d2_del_args;
-		for(int z : v2) { d2_del_args.push_back(node_val {d2, z}); }
-		while(task_count < v2.size()) {
-			for(int tidx = 0; tidx < thread_count; tidx++) {
-				pthread_create(&threads[tidx], nullptr, del, (void*) &d2_del_args[task_count++]);
-				if(task_count == v1.size()) { break; }
-			}	
-			for(int tidx = 0; tidx < thread_count; tidx++) {
-				pthread_join(threads[tidx], nullptr);		
-			}
-		}
-
-		// Performing The Final Complex Operation From D3
-		std::vector<node_val> d3_args;
-		std::vector<bool> is_lookup;
-		for(int z : v3) {
-			if(dist(gen) >= 0.5) { 
-				d3_args.append(node_val{d3, z}); 
-				is_lookup.push_back(true); // Lookup
-			} 
-			else { 
-				d3_args.append(node_val{d3, z}); 
-				is_lookup.push_back(false); // Delete
-			}
-		}
-		
-		// Printing Output
-		gettimeofday(&end, nullptr);	
-		timersub(&end, &start, &diff);
-		double total_time = diff.tv_sec + ((float) diff.tv_usec) / 1000000;
-		std::cout << "\nTotal Sec With " << thread_count;
-		std::cout << " Threads: " << total_time << std::endl;
-
-		// Freeing Memory
-		delete[] threads;
-		delete_tree(d1);
-		delete_tree(d2);
-		delete_tree(d3);
 	}
+
+	// Deleting All V2 Nodes From D2
+	std::vector<node_val> d2_del_args;
+	for(int z : v2) { d2_del_args.push_back(node_val {d2, z}); }
+	while(task_count < v2.size()) {
+		for(int tidx = 0; tidx < thread_count; tidx++) {
+			pthread_create(&threads[tidx], nullptr, del, (void*) &d2_del_args[task_count++]);
+			if(task_count == v2.size()) { break; }
+		}	
+		for(int tidx = 0; tidx < thread_count; tidx++) {
+			pthread_join(threads[tidx], nullptr);		
+		}
+	}
+
+	// Performing The Final Complex Operation From D3
+	std::vector<node_val> d3_args;
+	std::vector<bool> is_lookup;
+	for(int z : v3) {
+		if(dist(gen) >= 0.5) { 
+			d3_args.push_back(node_val{d3, z}); 
+			is_lookup.push_back(true); // Lookup
+		} 
+		else { 
+			d3_args.push_back(node_val{d3, z}); 
+			is_lookup.push_back(false); // Delete
+		}
+	}
+
+	while(task_count < v3.size()) {
+		for(int tidx = 0; tidx < thread_count; tidx++) {
+			if(is_lookup.at(task_count)) {
+				pthread_create(&threads[tidx], nullptr, lkup, (void*) &d3_args[task_count++]);
+			} else {
+				pthread_create(&threads[tidx], nullptr, del, (void*) &d3_args[task_count++]);
+			}
+			if(task_count == v3.size()) { break; }
+		}	
+		for(int tidx = 0; tidx < thread_count; tidx++) {
+			pthread_join(threads[tidx], nullptr);		
+		}
+	}
+
+	// Printing Output
+	gettimeofday(&end, nullptr);	
+	timersub(&end, &start, &diff);
+	double total_time = diff.tv_sec + ((float) diff.tv_usec) / 1000000;
+
+	FILE* fp = fopen("part1res.txt", "a");
+	fprintf(fp, "%lf Sec : %d Threads \n",total_time, thread_count);
+
+	// Freeing Memory
+	delete[] threads;
+	delete_tree(d1);
+	delete_tree(d2);
+	delete_tree(d3);
 
 	return 0;
 }
