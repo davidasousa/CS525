@@ -2,5 +2,5 @@
 
 for i in {1..128}
 do
-	./run $i
+	./run1 $i
 done

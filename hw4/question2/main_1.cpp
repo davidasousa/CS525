@@ -197,7 +197,10 @@ randomize_vec(std::vector<int>& vec, int frac, std::mt19937 gen) {
 // Main Functions
 int 
 main(int argc, char* argv[]) {
-	if(argc != 2) { return 1; }
+	if(argc != 2) { 
+		std::cout << "Error Need Thread Argument" << std::endl;
+		return 1; 
+	}
 	int thread_count = std::stoi(argv[1]);
 
 	struct timeval start, end, diff;
@@ -232,17 +235,21 @@ main(int argc, char* argv[]) {
 	node* d2 = create_node(0, nullptr);
 	node* d3 = create_node(0, nullptr);
 
+	int threads_used = 0;
+	
 	// Inserting All V1 Values To D1
 	std::vector<node_val> d1_ins_args;
 	for(int z : v1) { d1_ins_args.push_back(node_val {d1, z}); }
 	while(task_count < v1.size()) {
 		for(int tidx = 0; tidx < thread_count; tidx++) {
 			pthread_create(&threads[tidx], nullptr, ins, (void*) &d1_ins_args[task_count++]);
+			threads_used++;
 			if(task_count == v1.size()) { break; }
 		}	
-		for(int tidx = 0; tidx < thread_count; tidx++) {
+		for(int tidx = 0; tidx < threads_used; tidx++) {
 			pthread_join(threads[tidx], nullptr);		
 		}
+		threads_used = 0;
 	}
 
 	// Deleting All V2 Nodes From D2
@@ -251,11 +258,13 @@ main(int argc, char* argv[]) {
 	while(task_count < v2.size()) {
 		for(int tidx = 0; tidx < thread_count; tidx++) {
 			pthread_create(&threads[tidx], nullptr, del, (void*) &d2_del_args[task_count++]);
+			threads_used++;
 			if(task_count == v2.size()) { break; }
 		}	
-		for(int tidx = 0; tidx < thread_count; tidx++) {
+		for(int tidx = 0; tidx < threads_used; tidx++) {
 			pthread_join(threads[tidx], nullptr);		
 		}
+		threads_used = 0;
 	}
 
 	// Performing The Final Complex Operation From D3
@@ -279,11 +288,13 @@ main(int argc, char* argv[]) {
 			} else {
 				pthread_create(&threads[tidx], nullptr, del, (void*) &d3_args[task_count++]);
 			}
+			threads_used++;
 			if(task_count == v3.size()) { break; }
 		}	
-		for(int tidx = 0; tidx < thread_count; tidx++) {
+		for(int tidx = 0; tidx < threads_used; tidx++) {
 			pthread_join(threads[tidx], nullptr);		
 		}
+		threads_used = 0;
 	}
 
 	// Printing Output
